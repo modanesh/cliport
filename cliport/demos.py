@@ -45,6 +45,7 @@ def main(cfg):
             raise Exception("Invalid mode. Valid options: train, val, test")
 
     # Collect training data from oracle demonstrations.
+    successful_demos = 0
     while dataset.n_episodes < cfg['n']:
         episode, total_reward = [], 0
         seed += 2
@@ -77,6 +78,7 @@ def main(cfg):
             total_reward += reward
             print(f'Total Reward: {total_reward:.3f} | Done: {done} | Goal: {lang_goal}')
             if done:
+                successful_demos += 1
                 break
         episode.append((obs, None, reward, info))
 
@@ -87,7 +89,7 @@ def main(cfg):
         # Only save completed demonstrations.
         if save_data and total_reward > 0.99:
             dataset.add(seed, episode)
-
+    print(f'Total demos: {dataset.n_episodes} | Successful demos: {successful_demos} | Success rate: {successful_demos/dataset.n_episodes:.2f}')
 
 if __name__ == '__main__':
     main()
