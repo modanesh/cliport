@@ -96,6 +96,7 @@ def main(vcfg):
 
             record = vcfg['record']['save_video']
             n_demos = vcfg['n_demos']
+            successful_evals = 0
 
             # Run testing and save total rewards with last transition info.
             for i in range(0, n_demos):
@@ -136,6 +137,7 @@ def main(vcfg):
                     total_reward += reward
                     print(f'Total Reward: {total_reward:.3f} | Done: {done}\n')
                     if done:
+                        successful_evals += 1
                         break
 
                 results.append((total_reward, info))
@@ -150,6 +152,7 @@ def main(vcfg):
                 'episodes': results,
                 'mean_reward': mean_reward,
             }
+            print(f'Total demos: {n_demos} | Successful demos: {successful_evals} | Success rate: {successful_evals / n_demos:.2f}')
 
         # Save results in a json file.
         if vcfg['save_results']:
@@ -163,7 +166,6 @@ def main(vcfg):
 
             with open(save_json, 'w') as f:
                 json.dump(all_results, f, indent=4)
-
 
 def list_ckpts_to_eval(vcfg, existing_results):
     ckpts_to_eval = []
