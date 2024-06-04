@@ -45,10 +45,11 @@ def main(cfg):
             raise Exception("Invalid mode. Valid options: train, val, test")
 
     # Collect training data from oracle demonstrations.
-    successful_demos = 0
+    successful_demos, all_demos = 0, 0
     while dataset.n_episodes < cfg['n']:
         episode, total_reward = [], 0
         seed += 2
+        all_demos += 1
 
         # Set seeds.
         np.random.seed(seed)
@@ -89,7 +90,7 @@ def main(cfg):
         # Only save completed demonstrations.
         if save_data and total_reward > 0.99:
             dataset.add(seed, episode)
-    print(f'Total demos: {dataset.n_episodes} | Successful demos: {successful_demos} | Success rate: {successful_demos/dataset.n_episodes:.2f}')
+    print(f'Total demos: {all_demos} | Successful demos: {successful_demos} | Success rate: {successful_demos/all_demos:.2f}')
 
 if __name__ == '__main__':
     main()
