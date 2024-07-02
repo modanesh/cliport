@@ -11,7 +11,7 @@ class TwoStreamAttentionLangFusion(Attention):
     """Two Stream Language-Conditioned Attention (a.k.a Pick) module."""
 
     def __init__(self, stream_fcn, in_shape, n_rotations, preprocess, cfg, device):
-        self.fusion_type = cfg['train']['attn_stream_fusion_type']
+        self.fusion_type = cfg['train']['attn_stream_fusion_type'] if 'train' in cfg else cfg['attn_stream_fusion_type']
         super().__init__(stream_fcn, in_shape, n_rotations, preprocess, cfg, device)
 
     def _build_nets(self):
@@ -33,10 +33,17 @@ class TwoStreamAttentionLangFusion(Attention):
 
     def forward(self, inp_img, lang_goal, softmax=True):
         """Forward pass."""
-        in_data = np.pad(inp_img, self.padding, mode='constant')
-        in_shape = (1,) + in_data.shape
-        in_data = in_data.reshape(in_shape)
-        in_tens = torch.from_numpy(in_data).to(dtype=torch.float, device=self.device)  # [B W H 6]
+        if isinstance(inp_img, np.ndarray):
+            in_data = np.pad(inp_img, self.padding, mode='constant')
+            in_shape = (1,) + in_data.shape
+            in_data = in_data.reshape(in_shape)
+            in_tens = torch.from_numpy(in_data).to(dtype=torch.float, device=self.device)  # [B W H 6]
+        else:
+            pad = tuple(self.padding[::-1].flatten())
+            in_data = F.pad(inp_img, pad, mode='constant')
+            in_shape = (1,) + in_data.shape
+            in_data = in_data.reshape(in_shape)
+            in_tens = in_data
 
         # Rotation pivot.
         pv = np.array(in_data.shape[1:3]) // 2
@@ -62,17 +69,18 @@ class TwoStreamAttentionLangFusion(Attention):
 
         logits = logits.permute(1, 2, 3, 0)  # [B W H 1]
         output = logits.reshape(1, np.prod(logits.shape))
+        features = output
         if softmax:
             output = F.softmax(output, dim=-1)
             output = output.reshape(logits.shape[1:])
-        return output
+        return output, features
 
 
 class TwoStreamAttentionLangFusionLat(TwoStreamAttentionLangFusion):
     """Language-Conditioned Attention (a.k.a Pick) module with lateral connections."""
 
     def __init__(self, stream_fcn, in_shape, n_rotations, preprocess, cfg, device):
-        self.fusion_type = cfg['train']['attn_stream_fusion_type']
+        self.fusion_type = cfg['train']['attn_stream_fusion_type'] if 'train' in cfg else cfg['attn_stream_fusion_type']
         super().__init__(stream_fcn, in_shape, n_rotations, preprocess, cfg, device)
 
     def attend(self, x, l):

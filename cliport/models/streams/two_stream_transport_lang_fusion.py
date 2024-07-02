@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import torch.nn.functional as F
 
 import cliport.models as models
 import cliport.models.core.fusion as fusion
@@ -10,7 +11,7 @@ class TwoStreamTransportLangFusion(Transport):
     """Two Stream Transport (a.k.a Place) module"""
 
     def __init__(self, stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device):
-        self.fusion_type = cfg['train']['trans_stream_fusion_type']
+        self.fusion_type = cfg['train']['trans_stream_fusion_type'] if 'train' in cfg else cfg['trans_stream_fusion_type']
         super().__init__(stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device)
 
     def _build_nets(self):
@@ -34,30 +35,37 @@ class TwoStreamTransportLangFusion(Transport):
 
     def forward(self, inp_img, p, lang_goal, softmax=True):
         """Forward pass."""
-        img_unprocessed = np.pad(inp_img, self.padding, mode='constant')
-        input_data = img_unprocessed
-        in_shape = (1,) + input_data.shape
-        input_data = input_data.reshape(in_shape)
-        in_tensor = torch.from_numpy(input_data).to(dtype=torch.float, device=self.device)
+        if isinstance(inp_img, np.ndarray):
+            in_data = np.pad(inp_img, self.padding, mode='constant')
+            in_shape = (1,) + in_data.shape
+            in_data = in_data.reshape(in_shape)
+            in_tens = torch.from_numpy(in_data).to(dtype=torch.float, device=self.device)
+        else:
+            pad = tuple(self.padding[::-1].flatten())
+            in_data = F.pad(inp_img, pad, mode='constant')
+            in_shape = (1,) + in_data.shape
+            in_data = in_data.reshape(in_shape)
+            in_tens = in_data
+
 
         # Rotation pivot.
         pv = np.array([p[0], p[1]]) + self.pad_size
 
         # Crop before network (default for Transporters CoRL 2020).
         hcrop = self.pad_size
-        in_tensor = in_tensor.permute(0, 3, 1, 2)
+        in_tens = in_tens.permute(0, 3, 1, 2)
 
-        crop = in_tensor.repeat(self.n_rotations, 1, 1, 1)
+        crop = in_tens.repeat(self.n_rotations, 1, 1, 1)
         crop = self.rotator(crop, pivot=pv)
         crop = torch.cat(crop, dim=0)
         crop = crop[:, :, pv[0]-hcrop:pv[0]+hcrop, pv[1]-hcrop:pv[1]+hcrop]
 
-        logits, kernel = self.transport(in_tensor, crop, lang_goal)
+        logits, kernel = self.transport(in_tens, crop, lang_goal)
 
         # TODO(Mohit): Crop after network. Broken for now.
         # # Crop after network (for receptive field, and more elegant).
-        # in_tensor = in_tensor.permute(0, 3, 1, 2)
-        # logits, crop = self.transport(in_tensor, lang_goal)
+        # in_tens = in_tens.permute(0, 3, 1, 2)
+        # logits, crop = self.transport(in_tens, lang_goal)
         # crop = crop.repeat(self.n_rotations, 1, 1, 1)
         # crop = self.rotator(crop, pivot=pv)
         # crop = torch.cat(crop, dim=0)
@@ -72,7 +80,7 @@ class TwoStreamTransportLangFusionLat(TwoStreamTransportLangFusion):
 
     def __init__(self, stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device):
 
-        self.fusion_type = cfg['train']['trans_stream_fusion_type']
+        self.fusion_type = cfg['train']['trans_stream_fusion_type'] if 'train' in cfg else cfg['trans_stream_fusion_type']
         super().__init__(stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device)
 
     def transport(self, in_tensor, crop, l):
