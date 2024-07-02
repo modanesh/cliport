@@ -27,25 +27,25 @@ class TransporterAgent(LightningModule):
         self.test_ds = test_ds
 
         self.name = name
-        self.task = cfg['train']['task']
+        self.task = cfg['train']['task'] if 'train' in cfg else cfg['task']
         self.total_steps = 0
         self.crop_size = 64
-        self.n_rotations = cfg['train']['n_rotations']
+        self.n_rotations = cfg['train']['n_rotations'] if 'train' in cfg else cfg['n_rotations']
 
         self.pix_size = 0.003125
         self.in_shape = (320, 160, 6)
         self.cam_config = cameras.RealSenseD415.CONFIG
         self.bounds = np.array([[0.25, 0.75], [-0.5, 0.5], [0, 0.28]])
 
-        self.val_repeats = cfg['train']['val_repeats']
-        self.save_steps = cfg['train']['save_steps']
+        self.val_repeats = cfg['train']['val_repeats'] if 'train' in cfg else cfg['val_repeats']
+        self.save_steps = cfg['train']['save_steps'] if 'train' in cfg else cfg['save_steps']
 
         self._build_model()
         self._optimizers = {
-            'attn': torch.optim.Adam(self.attention.parameters(), lr=self.cfg['train']['lr']),
-            'trans': torch.optim.Adam(self.transport.parameters(), lr=self.cfg['train']['lr'])
+            'attn': torch.optim.Adam(self.attention.parameters(), lr=self.cfg['train']['lr'] if 'train' in cfg else cfg['weak_agent_lr']),
+            'trans': torch.optim.Adam(self.transport.parameters(), lr=self.cfg['train']['lr'] if 'train' in cfg else cfg['weak_agent_lr'])
         }
-        print("Agent: {}, Logging: {}".format(name, cfg['train']['log']))
+        print("Agent: {}, Logging: {}".format(name, cfg['train']['log'] if 'train' in cfg else cfg['log']))
 
     def _build_model(self):
         self.attention = None

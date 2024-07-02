@@ -21,8 +21,8 @@ class CLIPLingUNetLat(nn.Module):
         self.input_dim = 2048  # penultimate layer channel-size of CLIP-RN50
         self.cfg = cfg
         self.device = device
-        self.batchnorm = self.cfg['train']['batchnorm']
-        self.lang_fusion_type = self.cfg['train']['lang_fusion_type']
+        self.batchnorm = self.cfg['train']['batchnorm'] if 'train' in self.cfg else self.cfg['batchnorm']
+        self.lang_fusion_type = self.cfg['train']['lang_fusion_type'] if 'train' in self.cfg else self.cfg['lang_fusion_type']
         self.bilinear = True
         self.up_factor = 2 if self.bilinear else 1
         self.preprocess = preprocess

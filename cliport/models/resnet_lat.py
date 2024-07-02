@@ -14,7 +14,7 @@ class ResNet45_10s(nn.Module):
         self.output_dim = output_dim
         self.cfg = cfg
         self.device = device
-        self.batchnorm = self.cfg['train']['batchnorm']
+        self.batchnorm = self.cfg['train']['batchnorm'] if 'train' in self.cfg else self.cfg['batchnorm']
         self.preprocess = preprocess
 
         self._make_layers()

@@ -5,6 +5,7 @@ import pickle
 import warnings
 
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 
 from cliport import tasks
@@ -32,12 +33,12 @@ class RavensDataset(Dataset):
         self.sample_set = []
         self.max_seed = -1
         self.n_episodes = 0
-        self.images = self.cfg['dataset']['images']
-        self.cache = self.cfg['dataset']['cache']
+        self.images = self.cfg['dataset']['images'] if 'dataset' in self.cfg else self.cfg['dataset_images']
+        self.cache = self.cfg['dataset']['cache'] if 'dataset' in self.cfg else self.cfg['dataset_cache']
         self.n_demos = n_demos
         self.augment = augment
 
-        self.aug_theta_sigma = self.cfg['dataset']['augment']['theta_sigma'] if 'augment' in self.cfg['dataset'] else 60  # legacy code issue: theta_sigma was newly added
+        self.aug_theta_sigma = self.cfg['dataset']['augment']['theta_sigma'] if 'dataset' in self.cfg and 'augment' in self.cfg['dataset'] else 60  # legacy code issue: theta_sigma was newly added
         self.pix_size = 0.003125
         self.in_shape = (320, 160, 6)
         self.cam_config = cameras.RealSenseD415.CONFIG
@@ -55,8 +56,8 @@ class RavensDataset(Dataset):
         self._cache = {}
 
         if self.n_demos > 0:
-            self.images = self.cfg['dataset']['images']
-            self.cache = self.cfg['dataset']['cache']
+            self.images = self.cfg['dataset']['images'] if 'dataset' in self.cfg else self.cfg['dataset_images']
+            self.cache = self.cfg['dataset']['cache'] if 'dataset' in self.cfg else self.cfg['dataset_cache']
 
             # Check if there sufficient demos in the dataset
             if self.n_demos > self.n_episodes:
@@ -679,12 +680,12 @@ class RavensMultiTaskDataset(RavensDataset):
         self.sample_set = {}
         self.max_seed = -1
         self.n_episodes = 0
-        self.images = self.cfg['dataset']['images']
-        self.cache = self.cfg['dataset']['cache']
+        self.images = self.cfg['dataset']['images'] if 'dataset' in self.cfg else self.cfg['dataset_images']
+        self.cache = self.cfg['dataset']['cache'] if 'dataset' in self.cfg else self.cfg['dataset_cache']
         self.n_demos = n_demos
         self.augment = augment
 
-        self.aug_theta_sigma = self.cfg['dataset']['augment']['theta_sigma'] if 'augment' in self.cfg['dataset'] else 60  # legacy code issue: theta_sigma was newly added
+        self.aug_theta_sigma = self.cfg['dataset']['augment']['theta_sigma'] if 'dataset' in self.cfg and 'augment' in self.cfg['dataset'] else 60  # legacy code issue: theta_sigma was newly added
         self.pix_size = 0.003125
         self.in_shape = (320, 160, 6)
         self.cam_config = cameras.RealSenseD415.CONFIG
@@ -710,7 +711,7 @@ class RavensMultiTaskDataset(RavensDataset):
             episodes[task] = np.random.choice(range(n_episodes), min(self.n_demos, n_episodes), False)
 
         if self.n_demos > 0:
-            self.images = self.cfg['dataset']['images']
+            self.images = self.cfg['dataset']['images'] if 'dataset' in self.cfg else self.cfg['dataset_images']
             self.cache = False # TODO(mohit): fix caching for multi-task dataset
             self.set(episodes)
 

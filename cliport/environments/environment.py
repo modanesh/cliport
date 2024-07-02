@@ -3,6 +3,9 @@
 import os
 import tempfile
 import time
+from functools import partial
+from typing import Dict, Any, Tuple, List
+
 import cv2
 import imageio
 
@@ -13,6 +16,8 @@ from cliport.utils import pybullet_utils
 from cliport.utils import utils
 
 import pybullet as p
+import multiprocessing as mp
+
 
 PLACE_STEP = 0.0003
 PLACE_DELTA_THRESHOLD = 0.005
@@ -518,3 +523,84 @@ class EnvironmentNoRotationsWithHeightmap(Environment):
                                                self.task.bounds, pix_size=0.003125)
         obs['heightmap'] = (cmap, hmap)
         return obs
+
+
+class VectorizedEnvironment:
+    def __init__(self, num_envs, assets_root, task=None, disp=False, shared_memory=False, hz=240):
+        self.num_envs = num_envs
+        self.envs = [Environment(assets_root, task, disp, shared_memory, hz) for _ in range(num_envs)]
+        self.pool = mp.Pool(processes=num_envs)
+
+        self.observation_space = self.envs[0].observation_space
+        self.action_space = self.envs[0].action_space
+
+    def __del__(self):
+        self.close()
+
+    def reset(self) -> List[Dict[str, Any]]:
+        """Reset all environments and return initial observations."""
+        return self.pool.map(_reset, self.envs)
+
+    def step(self, actions: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], np.ndarray, np.ndarray, List[Dict[str, Any]]]:
+        results = self.pool.starmap(_step, zip(self.envs, actions))
+        obs, rewards, dones, infos = zip(*results)
+        return list(obs), np.array(rewards), np.array(dones), list(infos)
+
+    def render(self, mode='rgb_array') -> List[np.ndarray]:
+        """Render all environments."""
+        return self.pool.map(_render, self.envs)
+
+    def close(self):
+        """Close all environments and the multiprocessing pool."""
+        for env in self.envs:
+            env.close()
+        if hasattr(self, 'pool'):
+            self.pool.close()
+            self.pool.join()
+
+    def seed(self, seeds: List[int] = None) -> List[int]:
+        """Set seeds for all environments."""
+        if seeds is None:
+            seeds = [None] * self.num_envs
+        return self.pool.starmap(_seed, zip(self.envs, seeds))
+
+    @property
+    def is_static(self) -> List[bool]:
+        """Return true if objects are no longer moving in all environments."""
+        return self.pool.map(_is_static, self.envs)
+
+    def set_task(self, task):
+        if isinstance(task, list):
+            assert len(task) == self.num_envs, "Number of tasks must match number of environments"
+            self.pool.starmap(_set_task, zip(self.envs, task))
+        else:
+            self.pool.map(partial(_set_task, task=task), self.envs)
+
+    def get_lang_goal(self) -> List[str]:
+        """Get language goals from all environments."""
+        return self.pool.map(_get_lang_goal, self.envs)
+
+
+def _reset(env):
+    return env.reset()
+
+def _step(env, action):
+    return env.step(action)
+
+def _render(env, mode='rgb_array'):
+    return env.render(mode)
+
+def _close(env):
+    env.close()
+
+def _seed(env, seed):
+    return env.seed(seed)
+
+def _is_static(env):
+    return env.is_static
+
+def _set_task(env, task):
+    env.set_task(task)
+
+def _get_lang_goal(env):
+    return env.get_lang_goal()
