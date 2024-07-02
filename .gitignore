@@ -1,5 +1,6 @@
 # Folders
-cliport/data/
+data
+exps
 cliport/outputs/
 cliport/notebooks/
 cliport/jobs/
