@@ -40,8 +40,8 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
         inp_img = inp['inp_img']
         lang_goal = inp['lang_goal']
 
-        out = self.attention.forward(inp_img, lang_goal, softmax=softmax)
-        return out
+        out, features = self.attention.forward(inp_img, lang_goal, softmax=softmax)
+        return out, features
 
     def attn_training_step(self, frame, backprop=True, compute_err=False):
         inp_img = frame['img']
@@ -57,8 +57,8 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
         p0 = inp['p0']
         lang_goal = inp['lang_goal']
 
-        out = self.transport.forward(inp_img, p0, lang_goal, softmax=softmax)
-        return out
+        out, features = self.transport.forward(inp_img, p0, lang_goal, softmax=softmax)
+        return out, features
 
     def transport_training_step(self, frame, backprop=True, compute_err=False):
         inp_img = frame['img']
@@ -79,7 +79,7 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
 
         # Attention model forward pass.
         pick_inp = {'inp_img': img, 'lang_goal': lang_goal}
-        pick_conf = self.attn_forward(pick_inp)
+        pick_conf, pick_features = self.attn_forward(pick_inp)
         pick_conf = pick_conf.detach().cpu().numpy()
         argmax = np.argmax(pick_conf)
         argmax = np.unravel_index(argmax, shape=pick_conf.shape)
@@ -88,7 +88,7 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
 
         # Transport model forward pass.
         place_inp = {'inp_img': img, 'p0': p0_pix, 'lang_goal': lang_goal}
-        place_conf = self.trans_forward(place_inp)
+        place_conf, place_features = self.trans_forward(place_inp)
         place_conf = place_conf.permute(1, 2, 0)
         place_conf = place_conf.detach().cpu().numpy()
         argmax = np.argmax(place_conf)
@@ -108,7 +108,29 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
             'pose1': (np.asarray(p1_xyz), np.asarray(p1_xyzw)),
             'pick': [p0_pix[0], p0_pix[1], p0_theta],
             'place': [p1_pix[0], p1_pix[1], p1_theta],
-        }
+        }, pick_features, place_features
+
+    def extract_features(self, img, info):
+        """Run inference and return best action given visual observations."""
+        # Get heightmap from RGB-D images.
+        b_pick_features, b_place_features = [], []
+        for i in range(len(img)):
+            lang_goal = info[i]['lang_goal']
+
+            # Attention model forward pass.
+            pick_inp = {'inp_img': img[i], 'lang_goal': lang_goal}
+            pick_conf, pick_features = self.attn_forward(pick_inp)
+            pick_conf = pick_conf.detach().cpu().numpy()
+            argmax = np.argmax(pick_conf)
+            argmax = np.unravel_index(argmax, shape=pick_conf.shape)
+            p0_pix = argmax[:2]
+
+            # Transport model forward pass.
+            place_inp = {'inp_img': img[i], 'p0': p0_pix, 'lang_goal': lang_goal}
+            _, place_features = self.trans_forward(place_inp)
+            b_pick_features.append(pick_features)
+            b_place_features.append(place_features)
+        return b_pick_features, b_place_features
 
 
 class TwoStreamClipFilmLingUNetLatTransporterAgent(TwoStreamClipLingUNetTransporterAgent):
