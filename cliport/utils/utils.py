@@ -16,7 +16,7 @@ from transforms3d import euler
 import pybullet as p
 import kornia
 from omegaconf import OmegaConf
-
+from cliport.tasks import cameras
 import os
 import torch
 
@@ -391,8 +391,7 @@ def deprocess(img):
 
 def get_fused_heightmap(obs, configs, bounds, pix_size):
     """Reconstruct orthographic heightmaps with segmentation masks."""
-    heightmaps, colormaps = reconstruct_heightmaps(
-        obs['color'], obs['depth'], configs, bounds, pix_size)
+    heightmaps, colormaps = reconstruct_heightmaps(obs['color'], obs['depth'], configs, bounds, pix_size)
     colormaps = np.float32(colormaps)
     heightmaps = np.float32(heightmaps)
 
@@ -597,6 +596,22 @@ class ImageRotator:
             rot_x_list.append(x_warped)
 
         return rot_x_list
+
+
+def get_image(obs):
+    """Stack color and height images image."""
+    bounds = np.array([[0.25, 0.75], [-0.5, 0.5], [0, 0.28]])
+    pix_size = 0.003125
+    in_shape = (320, 160, 6)
+    cam_config = cameras.RealSenseD415.CONFIG
+
+    cmap, hmap = get_fused_heightmap(obs, cam_config, bounds, pix_size)
+    img = np.concatenate((cmap,
+                          hmap[Ellipsis, None],
+                          hmap[Ellipsis, None],
+                          hmap[Ellipsis, None]), axis=2)
+    assert img.shape == in_shape, img.shape
+    return img
 
 
 # -----------------------------------------------------------------------------
