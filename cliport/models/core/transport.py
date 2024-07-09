@@ -53,15 +53,13 @@ class Transport(nn.Module):
         """Correlate two input tensors."""
         output = F.conv2d(in0, in1, padding=(self.pad_size, self.pad_size))
         output = F.interpolate(output, size=(in0.shape[-2], in0.shape[-1]), mode='bilinear')
-        features = output[:,:,self.pad_size:-self.pad_size, self.pad_size:-self.pad_size]
-        features = features.reshape((1, np.prod(features.shape)))
         output = output[:,:,self.pad_size:-self.pad_size, self.pad_size:-self.pad_size]
         if softmax:
             output_shape = output.shape
             output = output.reshape((1, np.prod(output.shape)))
             output = F.softmax(output, dim=-1)
             output = output.reshape(output_shape[1:])
-        return output, features
+        return output
 
     def transport(self, in_tensor, crop):
         logits = self.key_resnet(in_tensor)

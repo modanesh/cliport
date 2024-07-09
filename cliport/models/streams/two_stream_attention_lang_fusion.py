@@ -55,10 +55,13 @@ class TwoStreamAttentionLangFusion(Attention):
 
         # Forward pass.
         logits = []
+        features = []
         for x in in_tens:
-            lgts = self.attend(x, lang_goal)
+            lgts, ftrs = self.attend(x, lang_goal)
             logits.append(lgts)
+            features.append(ftrs)
         logits = torch.cat(logits, dim=0)
+        features = torch.cat(features, dim=0)
 
         # Rotate back output.
         logits = self.rotator(logits, reverse=True, pivot=pv)
@@ -69,7 +72,6 @@ class TwoStreamAttentionLangFusion(Attention):
 
         logits = logits.permute(1, 2, 3, 0)  # [B W H 1]
         output = logits.reshape(1, np.prod(logits.shape))
-        features = output
         if softmax:
             output = F.softmax(output, dim=-1)
             output = output.reshape(logits.shape[1:])
@@ -84,7 +86,9 @@ class TwoStreamAttentionLangFusionLat(TwoStreamAttentionLangFusion):
         super().__init__(stream_fcn, in_shape, n_rotations, preprocess, cfg, device)
 
     def attend(self, x, l):
-        x1, lat = self.attn_stream_one(x)
-        x2 = self.attn_stream_two(x, lat, l)
+        x1, lat, st_one_features = self.attn_stream_one(x)
+        x2, st_two_features = self.attn_stream_two(x, lat, l)
         x = self.fusion(x1, x2)
-        return x
+
+        features = torch.cat((st_one_features.flatten(), st_two_features.flatten()))
+        return x, features

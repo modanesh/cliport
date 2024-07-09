@@ -60,7 +60,7 @@ class TwoStreamTransportLangFusion(Transport):
         crop = torch.cat(crop, dim=0)
         crop = crop[:, :, pv[0]-hcrop:pv[0]+hcrop, pv[1]-hcrop:pv[1]+hcrop]
 
-        logits, kernel = self.transport(in_tens, crop, lang_goal)
+        logits, kernel, features = self.transport(in_tens, crop, lang_goal)
 
         # TODO(Mohit): Crop after network. Broken for now.
         # # Crop after network (for receptive field, and more elegant).
@@ -72,7 +72,7 @@ class TwoStreamTransportLangFusion(Transport):
         # hcrop = self.pad_size
         # kernel = crop[:, :, pv[0]-hcrop:pv[0]+hcrop, pv[1]-hcrop:pv[1]+hcrop]
 
-        return self.correlate(logits, kernel, softmax)
+        return self.correlate(logits, kernel, softmax), features
 
 
 class TwoStreamTransportLangFusionLat(TwoStreamTransportLangFusion):
@@ -84,12 +84,12 @@ class TwoStreamTransportLangFusionLat(TwoStreamTransportLangFusion):
         super().__init__(stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device)
 
     def transport(self, in_tensor, crop, l):
-        key_out_one, key_lat_one = self.key_stream_one(in_tensor)
-        key_out_two = self.key_stream_two(in_tensor, key_lat_one, l)
+        key_out_one, key_lat_one, st_one_features = self.key_stream_one(in_tensor)
+        key_out_two, st_two_features = self.key_stream_two(in_tensor, key_lat_one, l)
         logits = self.fusion_key(key_out_one, key_out_two)
 
-        query_out_one, query_lat_one = self.query_stream_one(crop)
-        query_out_two = self.query_stream_two(crop, query_lat_one, l)
+        query_out_one, query_lat_one, _ = self.query_stream_one(crop)
+        query_out_two, _ = self.query_stream_two(crop, query_lat_one, l)
         kernel = self.fusion_query(query_out_one, query_out_two)
-
-        return logits, kernel
+        features = torch.cat((st_one_features.flatten(), st_two_features.flatten()))
+        return logits, kernel, features
