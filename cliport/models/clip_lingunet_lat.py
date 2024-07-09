@@ -113,6 +113,7 @@ class CLIPLingUNetLat(nn.Module):
 
         assert x.shape[1] == self.input_dim
         x = self.conv1(x)
+        features = x
 
         x = self.lang_fuser1(x, l_input, x2_mask=l_mask, x2_proj=self.lang_proj1)
         x = self.up1(x, im[-2])
@@ -138,4 +139,4 @@ class CLIPLingUNetLat(nn.Module):
         x = self.conv2(x)
 
         x = F.interpolate(x, size=(in_shape[-2], in_shape[-1]), mode='bilinear')
-        return x
+        return x, features
