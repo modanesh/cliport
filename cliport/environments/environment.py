@@ -525,6 +525,48 @@ class EnvironmentNoRotationsWithHeightmap(Environment):
         return obs
 
 
+class HelpEnvWrapper(Environment):
+    def __init__(self, assets_root, weak_policy, strong_policy, reward_max, timeout, strong_query_cost, switching_agent_cost, task=None, disp=False,
+                 shared_memory=False, hz=240):
+        super(HelpEnvWrapper, self).__init__(assets_root, task, disp, shared_memory, hz)
+        self.action_space = gym.spaces.Discrete(2)
+        self.weak_policy = weak_policy
+        self.strong_policy = strong_policy
+        self.strong_query_cost_per_action = (reward_max / timeout) * strong_query_cost
+        self.switching_agent_cost_per_action = (reward_max / timeout) * switching_agent_cost
+        self.action = None
+        self.prev_action = None
+
+    def step(self, action=None):
+        if action is not None:
+            obs = self._get_obs()
+            info = self.info
+            goal = self.get_lang_goal()
+            if action[0] == 0:
+                new_action, _, _ = self.weak_policy.act(obs, info, goal)
+            elif action[0] == 1:
+                new_action = self.strong_policy(obs, info)
+            self.action = action
+            obs, reward, done, info = super(HelpEnvWrapper, self).step(new_action)
+            reward = self.strong_query(reward) if action[0] == 1 else reward
+            reward = self.switching_agent(reward, done)
+        else:
+            obs, reward, done, info = super(HelpEnvWrapper, self).step(action)
+        return obs, reward, done, info
+
+    def strong_query(self, rew):
+        return rew - self.strong_query_cost_per_action
+
+    def switching_agent(self, rew, done):
+        if self.prev_action is not None and self.prev_action[0] != self.action[0]:
+            rew -= self.switching_agent_cost_per_action
+        self.prev_action = self.action
+        return rew
+
+    def set_strong_policy(self, strong_policy):
+        self.strong_policy = strong_policy[0]
+
+
 class VectorizedEnvironment:
     def __init__(self, num_envs, assets_root, task=None, disp=False, shared_memory=False, hz=240):
         self.num_envs = num_envs
