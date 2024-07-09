@@ -16,7 +16,7 @@ from cliport.models.streams.two_stream_attention import TwoStreamAttentionLat
 from cliport.models.streams.two_stream_transport import TwoStreamTransportLat
 
 class TransporterAgent(LightningModule):
-    def __init__(self, name, cfg, train_ds, test_ds):
+    def __init__(self, name, cfg, train_ds=None, test_ds=None):
         super().__init__()
         utils.set_seed(0)
 
@@ -291,7 +291,7 @@ class TransporterAgent(LightningModule):
     def act(self, obs, info=None, goal=None):  # pylint: disable=unused-argument
         """Run inference and return best action given visual observations."""
         # Get heightmap from RGB-D images.
-        img = self.test_ds.get_image(obs)
+        img = self.test_ds.get_image(obs) if self.test_ds is not None else utils.get_image(obs)
 
         # Attention model forward pass.
         pick_inp = {'inp_img': img}

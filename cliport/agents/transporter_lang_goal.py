@@ -74,7 +74,7 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
     def act(self, obs, info, goal=None):  # pylint: disable=unused-argument
         """Run inference and return best action given visual observations."""
         # Get heightmap from RGB-D images.
-        img = self.test_ds.get_image(obs)
+        img = self.test_ds.get_image(obs) if self.test_ds is not None else utils.get_image(obs)
         lang_goal = info['lang_goal']
 
         # Attention model forward pass.
@@ -114,7 +114,7 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
         """Run inference and return best action given visual observations."""
         # Get heightmap from RGB-D images.
         b_pick_features, b_place_features = [], []
-        for i in range(len(img)):
+        for i in range(len(info)):
             lang_goal = info[i]['lang_goal']
 
             # Attention model forward pass.
@@ -160,7 +160,7 @@ class TwoStreamClipFilmLingUNetLatTransporterAgent(TwoStreamClipLingUNetTranspor
 
 
 class TwoStreamClipLingUNetLatTransporterAgent(TwoStreamClipLingUNetTransporterAgent):
-    def __init__(self, name, cfg, train_ds, test_ds):
+    def __init__(self, name, cfg, train_ds=None, test_ds=None):
         super().__init__(name, cfg, train_ds, test_ds)
 
     def _build_model(self):
