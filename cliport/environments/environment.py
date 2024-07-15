@@ -5,7 +5,7 @@ import tempfile
 import time
 from functools import partial
 from typing import Dict, Any, Tuple, List
-
+import torch
 import cv2
 import imageio
 
@@ -526,7 +526,7 @@ class EnvironmentNoRotationsWithHeightmap(Environment):
 
 
 class HelpEnvWrapper(Environment):
-    def __init__(self, assets_root, weak_policy, strong_policy, reward_max, timeout, strong_query_cost, switching_agent_cost, task=None, disp=False,
+    def __init__(self, assets_root, weak_policy, strong_policy, reward_max, timeout, strong_query_cost, switching_agent_cost, obs_type, device, task=None, disp=False,
                  shared_memory=False, hz=240):
         super(HelpEnvWrapper, self).__init__(assets_root, task, disp, shared_memory, hz)
         self.action_space = gym.spaces.Discrete(2)
@@ -536,6 +536,9 @@ class HelpEnvWrapper(Environment):
         self.switching_agent_cost_per_action = (reward_max / timeout) * switching_agent_cost
         self.action = None
         self.prev_action = None
+        assert obs_type in ["T1", "T2", "T3"], "obs_type should be one of ['T1', 'T2', 'T3']"
+        self.obs_type = obs_type
+        self.device = device
 
     def step(self, action=None):
         if action is not None:
@@ -550,9 +553,11 @@ class HelpEnvWrapper(Environment):
             obs, reward, done, info = super(HelpEnvWrapper, self).step(new_action)
             reward = self.strong_query(reward) if action[0] == 1 else reward
             reward = self.switching_agent(reward, done)
+            pi_w_hidden = self.get_weak_policy_features(utils.get_image(obs), info)
         else:
             obs, reward, done, info = super(HelpEnvWrapper, self).step(action)
-        return obs, reward, done, info
+            pi_w_hidden = None
+        return obs, reward, done, info, pi_w_hidden
 
     def strong_query(self, rew):
         return rew - self.strong_query_cost_per_action
@@ -565,6 +570,19 @@ class HelpEnvWrapper(Environment):
 
     def set_strong_policy(self, strong_policy):
         self.strong_policy = strong_policy[0]
+
+    def get_weak_policy_features(self, img, info):
+        pi_w_hidden = None
+        if self.obs_type in ["T2", "T3"]:
+            pi_w_pick_hidden, pi_w_place_hidden = self.weak_policy.extract_features(img, info)
+            pi_w_hidden = torch.cat([pi_w_pick_hidden, pi_w_place_hidden], dim=1)
+        return pi_w_hidden
+
+    def reset(self):
+        obs = super(HelpEnvWrapper, self).reset()
+        info = self.info
+        pi_w_hidden = self.get_weak_policy_features(utils.get_image(obs), info)
+        return obs, pi_w_hidden
 
 
 class VectorizedEnvironment:
