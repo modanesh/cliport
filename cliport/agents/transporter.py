@@ -45,7 +45,7 @@ class TransporterAgent(LightningModule):
             'attn': torch.optim.Adam(self.attention.parameters(), lr=self.cfg['train']['lr'] if 'train' in cfg else cfg['weak_agent_lr']),
             'trans': torch.optim.Adam(self.transport.parameters(), lr=self.cfg['train']['lr'] if 'train' in cfg else cfg['weak_agent_lr'])
         }
-        print("Agent: {}, Logging: {}".format(name, cfg['train']['log'] if 'train' in cfg else cfg['log']))
+        print("Agent: {}".format(name))
 
     def _build_model(self):
         self.attention = None
