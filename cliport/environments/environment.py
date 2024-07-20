@@ -582,7 +582,14 @@ class HelpEnvWrapper(Environment):
         pi_w_hidden = None
         if self.obs_type in ["T2", "T3"]:
             pi_w_pick_hidden, pi_w_place_hidden = self.weak_policy.extract_features(img, info)
-            pi_w_hidden = torch.cat([pi_w_pick_hidden[0], pi_w_place_hidden[0]], dim=0).unsqueeze(0)
+            if isinstance(pi_w_pick_hidden, list):
+                pi_w_pick_hidden = torch.stack(pi_w_pick_hidden)
+            if isinstance(pi_w_place_hidden, list):
+                pi_w_place_hidden = torch.stack(pi_w_place_hidden)
+            if pi_w_pick_hidden.dim() != 2:
+                pi_w_pick_hidden = pi_w_pick_hidden.unsqueeze(0)
+                pi_w_place_hidden = pi_w_place_hidden.unsqueeze(0)
+            pi_w_hidden = torch.cat([pi_w_pick_hidden, pi_w_place_hidden], dim=-1)
         return pi_w_hidden
 
     def reset(self, need_features=True):
