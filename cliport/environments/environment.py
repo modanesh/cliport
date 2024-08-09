@@ -123,6 +123,8 @@ class Environment(gym.Env):
         if task:
             self.set_task(task)
 
+        self.num_envs = 1
+
     def __del__(self):
         if hasattr(self, 'video_writer'):
             self.video_writer.close()
@@ -152,8 +154,12 @@ class Environment(gym.Env):
     # ---------------------------------------------------------------------------
 
     def seed(self, seed=None):
-        self._random = np.random.RandomState(seed)
+        self._seed = seed
+        self._random = np.random.RandomState(self._seed)
         return seed
+
+    def num_envs(self, num_envs):
+        self.num_envs = num_envs
 
     def reset(self):
         """Performs common reset functionality for all supported tasks."""
@@ -554,7 +560,7 @@ class HelpEnvWrapper(Environment):
                 new_action = self.strong_policy(obs, info)
             self.action = action
             obs, reward, done, info = super(HelpEnvWrapper, self).step(new_action)
-            reward = self.strong_query(reward) if action[0] == 1 else reward
+            reward = self.strong_query(reward)
             reward = self.switching_agent(reward, done)
             pi_w_hidden = self.get_weak_policy_features([utils.get_image(obs)], [info])
         else:
@@ -563,7 +569,9 @@ class HelpEnvWrapper(Environment):
         return obs, reward, done, info, pi_w_hidden
 
     def strong_query(self, rew):
-        return rew - self.strong_query_cost_per_action
+        if self.action[0] == 1:
+            rew = rew - self.strong_query_cost_per_action
+        return rew
 
     def switching_agent(self, rew, done):
         if self.prev_action is not None and self.prev_action[0] != self.action[0]:
@@ -581,7 +589,7 @@ class HelpEnvWrapper(Environment):
     def get_weak_policy_features(self, img, info):
         pi_w_hidden = None
         if self.obs_type in ["T2", "T3"]:
-            pi_w_pick_hidden, pi_w_place_hidden = self.weak_policy.extract_features(img, info)
+            pi_w_pick_hidden, pi_w_place_hidden = self.weak_policy.extract_features(img.permute(0, 2, 3, 1), info)
             if isinstance(pi_w_pick_hidden, list):
                 pi_w_pick_hidden = torch.stack(pi_w_pick_hidden)
             if isinstance(pi_w_place_hidden, list):
