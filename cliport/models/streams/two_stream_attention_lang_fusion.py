@@ -11,7 +11,7 @@ class TwoStreamAttentionLangFusion(Attention):
     """Two Stream Language-Conditioned Attention (a.k.a Pick) module."""
 
     def __init__(self, stream_fcn, in_shape, n_rotations, preprocess, cfg, device):
-        self.fusion_type = cfg['train']['attn_stream_fusion_type'] if 'train' in cfg else cfg['attn_stream_fusion_type']
+        self.fusion_type = cfg['train']['attn_stream_fusion_type'] if 'train' in cfg else 'add'
         super().__init__(stream_fcn, in_shape, n_rotations, preprocess, cfg, device)
 
     def _build_nets(self):
@@ -82,7 +82,7 @@ class TwoStreamAttentionLangFusionLat(TwoStreamAttentionLangFusion):
     """Language-Conditioned Attention (a.k.a Pick) module with lateral connections."""
 
     def __init__(self, stream_fcn, in_shape, n_rotations, preprocess, cfg, device):
-        self.fusion_type = cfg['train']['attn_stream_fusion_type'] if 'train' in cfg else cfg['attn_stream_fusion_type']
+        self.fusion_type = cfg['train']['attn_stream_fusion_type'] if 'train' in cfg else 'add'
         super().__init__(stream_fcn, in_shape, n_rotations, preprocess, cfg, device)
 
     def attend(self, x, l):

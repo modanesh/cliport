@@ -19,7 +19,7 @@ class Attention(nn.Module):
         self.preprocess = preprocess
         self.cfg = cfg
         self.device = device
-        self.batchnorm = self.cfg['train']['batchnorm'] if 'train' in self.cfg else self.cfg['batchnorm']
+        self.batchnorm = self.cfg['train']['batchnorm'] if 'train' in self.cfg else False
 
         self.padding = np.zeros((3, 2), dtype=int)
         max_dim = np.max(in_shape[:2])

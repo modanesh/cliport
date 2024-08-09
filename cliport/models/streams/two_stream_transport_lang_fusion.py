@@ -11,7 +11,7 @@ class TwoStreamTransportLangFusion(Transport):
     """Two Stream Transport (a.k.a Place) module"""
 
     def __init__(self, stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device):
-        self.fusion_type = cfg['train']['trans_stream_fusion_type'] if 'train' in cfg else cfg['trans_stream_fusion_type']
+        self.fusion_type = cfg['train']['trans_stream_fusion_type'] if 'train' in cfg else 'conv'
         super().__init__(stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device)
 
     def _build_nets(self):
@@ -80,7 +80,7 @@ class TwoStreamTransportLangFusionLat(TwoStreamTransportLangFusion):
 
     def __init__(self, stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device):
 
-        self.fusion_type = cfg['train']['trans_stream_fusion_type'] if 'train' in cfg else cfg['trans_stream_fusion_type']
+        self.fusion_type = cfg['train']['trans_stream_fusion_type'] if 'train' in cfg else 'conv'
         super().__init__(stream_fcn, in_shape, n_rotations, crop_size, preprocess, cfg, device)
 
     def transport(self, in_tensor, crop, l):

@@ -20,7 +20,7 @@ class Transport(nn.Module):
         self.preprocess = preprocess
         self.cfg = cfg
         self.device = device
-        self.batchnorm = self.cfg['train']['batchnorm'] if 'train' in self.cfg else self.cfg['batchnorm']
+        self.batchnorm = self.cfg['train']['batchnorm'] if 'train' in self.cfg else False
 
         self.pad_size = int(self.crop_size / 2)
         self.padding = np.zeros((3, 2), dtype=int)
