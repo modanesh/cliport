@@ -93,3 +93,22 @@ class TwoStreamTransportLangFusionLat(TwoStreamTransportLangFusion):
         kernel = self.fusion_query(query_out_one, query_out_two)
         features = torch.cat((st_one_features.flatten(), st_two_features.flatten()))
         return logits, kernel, features
+
+    def get_logits(self, inp_img, lang_goal):
+        if isinstance(inp_img, np.ndarray):
+            in_data = np.pad(inp_img, self.padding, mode='constant')
+            in_shape = (1,) + in_data.shape
+            in_data = in_data.reshape(in_shape)
+            in_tens = torch.from_numpy(in_data).to(dtype=torch.float, device=self.device)
+        else:
+            pad = tuple(self.padding[::-1].flatten())
+            in_data = F.pad(inp_img, pad, mode='constant')
+            in_shape = (1,) + in_data.shape
+            in_data = in_data.reshape(in_shape)
+            in_tens = in_data
+
+        in_tens = in_tens.permute(0, 3, 1, 2)
+        key_out_one, key_lat_one, st_one_features = self.key_stream_one(in_tens)
+        key_out_two, st_two_features = self.key_stream_two(in_tens, key_lat_one, lang_goal)
+        logits = self.fusion_key(key_out_one, key_out_two)
+        return logits

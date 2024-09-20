@@ -92,3 +92,44 @@ class TwoStreamAttentionLangFusionLat(TwoStreamAttentionLangFusion):
 
         features = torch.cat((st_one_features.flatten(), st_two_features.flatten()))
         return x, features
+
+    def get_logits(self, inp_img, lang_goal):
+        if isinstance(inp_img, np.ndarray):
+            in_data = np.pad(inp_img, self.padding, mode='constant')
+            in_shape = (1,) + in_data.shape
+            in_data = in_data.reshape(in_shape)
+            in_tens = torch.from_numpy(in_data).to(dtype=torch.float, device=self.device)  # [B W H 6]
+        else:
+            pad = tuple(self.padding[::-1].flatten())
+            in_data = F.pad(inp_img, pad, mode='constant')
+            in_shape = (1,) + in_data.shape
+            in_data = in_data.reshape(in_shape)
+            in_tens = in_data
+
+        # Rotation pivot.
+        pv = np.array(in_data.shape[1:3]) // 2
+
+        # Rotate input.
+        in_tens = in_tens.permute(0, 3, 1, 2)  # [B 6 W H]
+        in_tens = in_tens.repeat(self.n_rotations, 1, 1, 1)
+        in_tens = self.rotator(in_tens, pivot=pv)
+
+        # Forward pass.
+        logits = []
+        features = []
+        for x in in_tens:
+            lgts, ftrs = self.attend(x, lang_goal)
+            logits.append(lgts)
+            features.append(ftrs)
+        logits = torch.cat(logits, dim=0)
+        features = torch.cat(features, dim=0)
+
+        # Rotate back output.
+        logits = self.rotator(logits, reverse=True, pivot=pv)
+        logits = torch.cat(logits, dim=0)
+        c0 = self.padding[:2, 0]
+        c1 = c0 + inp_img.shape[:2]
+        logits = logits[:, :, c0[0]:c1[0], c0[1]:c1[1]]
+
+        logits = logits.permute(1, 2, 3, 0)  # [B W H 1]
+        return logits

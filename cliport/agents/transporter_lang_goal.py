@@ -74,7 +74,10 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
     def act(self, obs, info, goal=None):  # pylint: disable=unused-argument
         """Run inference and return best action given visual observations."""
         # Get heightmap from RGB-D images.
-        img = self.test_ds.get_image(obs) if self.test_ds is not None else utils.get_image(obs)
+        if isinstance(obs, np.ndarray):
+            img = obs
+        else:
+            img = self.test_ds.get_image(obs) if self.test_ds is not None else utils.get_image(obs)
         lang_goal = info['lang_goal']
 
         # Attention model forward pass.
