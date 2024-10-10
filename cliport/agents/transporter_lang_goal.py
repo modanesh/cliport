@@ -106,6 +106,44 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
         p0_xyzw = utils.eulerXYZ_to_quatXYZW((0, 0, -p0_theta))
         p1_xyzw = utils.eulerXYZ_to_quatXYZW((0, 0, -p1_theta))
 
+        # overriding the original features because they are too large:
+        # pick_features shape: (204800,)
+        # place_features shape: (344064,)
+
+        # Detailed explanation:
+
+        # 1. pick_features:
+        #    - Dimension: (1,)
+        #    - Meaning: Single confidence value for the chosen pick location
+        #    - This represents the model's confidence in picking at the specific
+        #      x, y coordinates (p0_pix[0], p0_pix[1])
+        #    - We're extracting just one value because pick_conf has shape (320, 160, 1)
+
+        # 2. place_features:
+        #    - Dimension: (36,)
+        #    - Meaning: Confidence values for all 36 possible rotations at the chosen place location
+        #    - This represents the model's confidence in placing at the specific
+        #      x, y coordinates (p1_pix[0], p1_pix[1]) for each of the 36 rotation angles
+        #    - We're extracting 36 values because place_conf has shape (320, 160, 36)
+
+        # Interpretation:
+        # - pick_features gives us a single value indicating how confident the model is
+        #   about picking at the chosen location.
+        # - place_features gives us 36 values, each representing the confidence for
+        #   placing the object at the chosen location with a specific rotation.
+        #   This allows us to understand not just where to place, but also how to orient the object.
+
+        # Benefits of this approach:
+        # 1. Drastically reduced feature size (from 204800 and 344064 to 1 and 36 respectively)
+        # 2. Directly interpretable features tied to the model's decision-making process
+        # 3. Captures the essential information about the chosen pick and place actions
+
+        # Note: This approach focuses on the model's final decision rather than
+        # intermediate features, which might lose some nuanced information but
+        # provides a very compact and directly relevant feature set.
+        pick_features = pick_conf[p0_pix[0], p0_pix[1], :]
+        place_features = place_conf[p1_pix[0], p1_pix[1], :]
+
         return {
             'pose0': (np.asarray(p0_xyz), np.asarray(p0_xyzw)),
             'pose1': (np.asarray(p1_xyz), np.asarray(p1_xyzw)),
@@ -130,7 +168,16 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
 
             # Transport model forward pass.
             place_inp = {'inp_img': img[i], 'p0': p0_pix, 'lang_goal': lang_goal}
-            _, place_features = self.trans_forward(place_inp)
+            place_conf, place_features = self.trans_forward(place_inp)
+            place_conf = place_conf.permute(1, 2, 0)
+            place_conf = place_conf.detach().cpu().numpy()
+            argmax = np.argmax(place_conf)
+            argmax = np.unravel_index(argmax, shape=place_conf.shape)
+            p1_pix = argmax[:2]
+
+            pick_features = pick_conf[p0_pix[0], p0_pix[1], :]
+            place_features = place_conf[p1_pix[0], p1_pix[1], :]
+
             b_pick_features.append(pick_features)
             b_place_features.append(place_features)
         return b_pick_features, b_place_features
