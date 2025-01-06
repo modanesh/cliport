@@ -94,6 +94,22 @@ class TwoStreamAttentionLangFusionLat(TwoStreamAttentionLangFusion):
         return x, features
 
     def get_logits(self, inp_img, lang_goal):
+        """
+        Return a single logit for the most confident pick location.
+
+        This function processes the input image and language goal to compute
+        a reduced logit representation focused on the most confident pick location.
+        It simplifies the output by retaining only the confidence value corresponding
+        to the highest pick location likelihood.
+
+        Args:
+            inp_img (np.ndarray or torch.Tensor): Input image (RGB-D) as a numpy array or tensor.
+            lang_goal (str): Language description of the goal.
+
+        Returns:
+            np.ndarray: A single-element array containing the logit value for the
+                        most confident pick location.
+        """
         if isinstance(inp_img, np.ndarray):
             in_data = np.pad(inp_img, self.padding, mode='constant')
             in_shape = (1,) + in_data.shape
@@ -132,4 +148,6 @@ class TwoStreamAttentionLangFusionLat(TwoStreamAttentionLangFusion):
         logits = logits[:, :, c0[0]:c1[0], c0[1]:c1[1]]
 
         logits = logits.permute(1, 2, 3, 0)  # [B W H 1]
-        return logits
+        logits = logits.detach().cpu().numpy()
+        max_idx = np.unravel_index(np.argmax(logits), logits.shape)
+        return torch.tensor(logits[max_idx].reshape(1)).to(self.device)

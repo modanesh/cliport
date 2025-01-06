@@ -47,7 +47,6 @@ class TwoStreamTransportLangFusion(Transport):
             in_data = in_data.reshape(in_shape)
             in_tens = in_data
 
-
         # Rotation pivot.
         pv = np.array([p[0], p[1]]) + self.pad_size
 
@@ -58,7 +57,7 @@ class TwoStreamTransportLangFusion(Transport):
         crop = in_tens.repeat(self.n_rotations, 1, 1, 1)
         crop = self.rotator(crop, pivot=pv)
         crop = torch.cat(crop, dim=0)
-        crop = crop[:, :, pv[0]-hcrop:pv[0]+hcrop, pv[1]-hcrop:pv[1]+hcrop]
+        crop = crop[:, :, pv[0] - hcrop:pv[0] + hcrop, pv[1] - hcrop:pv[1] + hcrop]
 
         logits, kernel, features = self.transport(in_tens, crop, lang_goal)
 
@@ -95,6 +94,17 @@ class TwoStreamTransportLangFusionLat(TwoStreamTransportLangFusion):
         return logits, kernel, features
 
     def get_logits(self, inp_img, lang_goal):
+        """
+        Return logits for the most confident spatial location, keeping rotation logits for 3 bins.
+
+        Args:
+            inp_img (np.ndarray or torch.Tensor): Input image (RGB-D) as a numpy array or tensor.
+            lang_goal (str): Language description of the goal.
+
+        Returns:
+            np.ndarray: An array of size 3 containing logits for rotation bins at the most confident
+                        spatial location.
+        """
         if isinstance(inp_img, np.ndarray):
             in_data = np.pad(inp_img, self.padding, mode='constant')
             in_shape = (1,) + in_data.shape
@@ -111,4 +121,9 @@ class TwoStreamTransportLangFusionLat(TwoStreamTransportLangFusion):
         key_out_one, key_lat_one, st_one_features = self.key_stream_one(in_tens)
         key_out_two, st_two_features = self.key_stream_two(in_tens, key_lat_one, lang_goal)
         logits = self.fusion_key(key_out_one, key_out_two)
-        return logits
+        logits = logits.detach().cpu().numpy()
+        spatial_conf = logits[0].sum(axis=0)  # Sum over rotation channels for spatial confidence (shape: 384x224).
+        max_spatial_idx = np.unravel_index(np.argmax(spatial_conf), spatial_conf.shape)  # (height, width)
+        # Extract rotation logits for the most confident spatial location.
+        rotation_logits = logits[0, :, max_spatial_idx[0], max_spatial_idx[1]]  # Retain 3 rotation logits.
+        return torch.tensor(rotation_logits).to(self.device)

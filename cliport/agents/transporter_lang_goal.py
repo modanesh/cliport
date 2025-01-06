@@ -1,5 +1,5 @@
 import numpy as np
-
+import torch
 from cliport.utils import utils
 from cliport.agents.transporter import TransporterAgent
 
@@ -161,19 +161,19 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
             # Attention model forward pass.
             pick_inp = {'inp_img': img[i], 'lang_goal': lang_goal}
             pick_conf, pick_features = self.attn_forward(pick_inp)
-            pick_conf = pick_conf.detach().cpu().numpy()
-            argmax = np.argmax(pick_conf)
-            argmax = np.unravel_index(argmax, shape=pick_conf.shape)
-            p0_pix = argmax[:2]
+            pick_conf = pick_conf.detach().cpu()
+            argmax = torch.argmax(pick_conf)
+            argmax_coords = self.unravel_index(argmax.item(), pick_conf.shape)
+            p0_pix = argmax_coords[:2]
 
             # Transport model forward pass.
             place_inp = {'inp_img': img[i], 'p0': p0_pix, 'lang_goal': lang_goal}
             place_conf, place_features = self.trans_forward(place_inp)
             place_conf = place_conf.permute(1, 2, 0)
-            place_conf = place_conf.detach().cpu().numpy()
-            argmax = np.argmax(place_conf)
-            argmax = np.unravel_index(argmax, shape=place_conf.shape)
-            p1_pix = argmax[:2]
+            place_conf = place_conf.detach().cpu()
+            argmax = torch.argmax(place_conf)
+            argmax_coords = self.unravel_index(argmax.item(), place_conf.shape)
+            p1_pix = argmax_coords[:2]
 
             pick_features = pick_conf[p0_pix[0], p0_pix[1], :]
             place_features = place_conf[p1_pix[0], p1_pix[1], :]
@@ -182,6 +182,13 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
             b_place_features.append(place_features)
         return b_pick_features, b_place_features
 
+    def unravel_index(self, index, shape):
+        """Manually unravel an index into coordinates for a given shape."""
+        coords = []
+        for dim in reversed(shape):
+            coords.append(index % dim)
+            index = index // dim
+        return tuple(reversed(coords))
 
 class TwoStreamClipFilmLingUNetLatTransporterAgent(TwoStreamClipLingUNetTransporterAgent):
     def __init__(self, name, cfg, train_ds, test_ds):
